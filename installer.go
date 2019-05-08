@@ -7,6 +7,8 @@ import (
 	"github.com/godbus/dbus"
 )
 
+// Installer is the central object interface that handles
+// all communication with the RAUC daemon
 type Installer struct {
 	conn   *dbus.Conn
 	object dbus.BusObject
@@ -16,11 +18,14 @@ const (
 	dbusInterface = "de.pengutronix.rauc"
 )
 
+// SlotStatus is returned by .GetSlotStatus() and contains information
+// on the status of an available boot slots.
 type SlotStatus struct {
 	SlotName string
 	Status   map[string]dbus.Variant
 }
 
+// InstallerNew returns a newly allocated Installer object
 func InstallerNew() (*Installer, error) {
 	p := new(Installer)
 	var err error
@@ -46,13 +51,13 @@ func (p *Installer) Install(filename string) error {
 
 	err := p.object.Call(p.interfaceForMember("Install"), 0, filename).Err
 	if err != nil {
-		return err
+		return fmt.Errorf("RAUC: Install(): %v", err)
 	}
 
 	for {
 		signal, ok := <-doneChannel
 		if !ok {
-			return errors.New("Cannot read from channel")
+			return errors.New("RAUC: Cannot read from channel")
 		}
 
 		if signal.Name == p.interfaceForMember("Completed") {
@@ -79,7 +84,7 @@ func (p *Installer) Install(filename string) error {
 func (p *Installer) Info(filename string) (compatible string, version string, err error) {
 	err = p.object.Call(p.interfaceForMember("Info"), 0, filename).Store(&compatible, &version)
 	if err != nil {
-		return "", "", err
+		return "", "", fmt.Errorf("RAUC: Info(): %v", err)
 	}
 
 	return compatible, version, nil
@@ -88,7 +93,7 @@ func (p *Installer) Info(filename string) (compatible string, version string, er
 func (p *Installer) Mark(state string, slotIdentifier string) (slotName string, message string, err error) {
 	err = p.object.Call(p.interfaceForMember("Mark"), 0, state, slotIdentifier).Store(&slotName, &message)
 	if err != nil {
-		return "", "", err
+		return "", "", fmt.Errorf("RAUC: Mark(): %v", err)
 	}
 
 	return slotName, message, nil
@@ -97,8 +102,7 @@ func (p *Installer) Mark(state string, slotIdentifier string) (slotName string, 
 func (p *Installer) GetSlotStatus() (status []SlotStatus, err error) {
 	err = p.object.Call(p.interfaceForMember("GetSlotStatus"), 0).Store(&status)
 	if err != nil {
-		fmt.Printf("ERROR:", err.Error())
-		return nil, err
+		return nil, fmt.Errorf("RAUC: GetSlotStatus(): %v", err)
 	}
 
 	return status, nil
@@ -109,7 +113,7 @@ func (p *Installer) GetSlotStatus() (status []SlotStatus, err error) {
 func (p *Installer) GetOperation() (string, error) {
 	v, err := p.object.GetProperty(p.interfaceForMember("Operation"))
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("RAUC: GetOperation(): %v", err)
 	}
 
 	return v.String(), nil
@@ -118,7 +122,7 @@ func (p *Installer) GetOperation() (string, error) {
 func (p *Installer) GetLastError() (string, error) {
 	v, err := p.object.GetProperty(p.interfaceForMember("LastError"))
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("RAUC: GetLastError(): %v", err)
 	}
 
 	return v.String(), nil
@@ -127,7 +131,7 @@ func (p *Installer) GetLastError() (string, error) {
 func (p *Installer) GetProgress() (percentage int32, message string, nestingDepth int32, err error) {
 	variant, err := p.object.GetProperty(p.interfaceForMember("Progress"))
 	if err != nil {
-		return -1, "", -1, err
+		return -1, "", -1, fmt.Errorf("RAUC: GetProperty(Progress): %v", err)
 	}
 
 	type progressResponse struct {
@@ -148,7 +152,7 @@ func (p *Installer) GetProgress() (percentage int32, message string, nestingDept
 func (p *Installer) GetCompatible() (string, error) {
 	v, err := p.object.GetProperty(p.interfaceForMember("Compatible"))
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("RAUC: GetProperty(Compatible): %v", err)
 	}
 
 	return v.String(), nil
@@ -157,7 +161,7 @@ func (p *Installer) GetCompatible() (string, error) {
 func (p *Installer) GetVariant() (string, error) {
 	v, err := p.object.GetProperty(p.interfaceForMember("Variant"))
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("RAUC: GetProperty(Variant): %v", err)
 	}
 
 	return v.String(), nil
@@ -166,7 +170,7 @@ func (p *Installer) GetVariant() (string, error) {
 func (p *Installer) GetBootSlot() (string, error) {
 	v, err := p.object.GetProperty(p.interfaceForMember("BootSlot"))
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("RAUC: GetProperty(BootSlot): %v", err)
 	}
 
 	return v.String(), nil
