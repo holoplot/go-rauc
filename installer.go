@@ -3,12 +3,13 @@ package rauc
 import (
 	"errors"
 	"fmt"
+
 	"github.com/godbus/dbus"
 )
 
 type Installer struct {
 	conn   *dbus.Conn
-	object  dbus.BusObject
+	object dbus.BusObject
 }
 
 const (
@@ -30,7 +31,7 @@ func InstallerNew() (*Installer, error) {
 
 	p.object = p.conn.Object(dbusInterface, dbus.ObjectPath("/"))
 	p.object.AddMatchSignal(fmt.Sprintf("%s.%s", dbusInterface, "Installer"), "Completed",
-							dbus.WithMatchObjectPath(p.object.Path()))
+		dbus.WithMatchObjectPath(p.object.Path()))
 
 	return p, nil
 }
@@ -49,7 +50,7 @@ func (p *Installer) Install(filename string) error {
 	}
 
 	for {
-		signal, ok := <- doneChannel
+		signal, ok := <-doneChannel
 		if !ok {
 			return errors.New("Cannot read from channel")
 		}
