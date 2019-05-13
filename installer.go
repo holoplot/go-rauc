@@ -45,6 +45,8 @@ func (p *Installer) interfaceForMember(method string) string {
 	return fmt.Sprintf("%s.%s.%s", dbusInterface, "Installer", method)
 }
 
+// Install triggers the installation of a bundle. This method waits for the "Completed"
+// signal to be sent by the RAUC daemon.
 func (p *Installer) Install(filename string) error {
 	doneChannel := make(chan *dbus.Signal, 10)
 	p.conn.Signal(doneChannel)
@@ -81,6 +83,7 @@ func (p *Installer) Install(filename string) error {
 	}
 }
 
+// Info provides information on a given bundle.
 func (p *Installer) Info(filename string) (compatible string, version string, err error) {
 	err = p.object.Call(p.interfaceForMember("Info"), 0, filename).Store(&compatible, &version)
 	if err != nil {
@@ -90,6 +93,8 @@ func (p *Installer) Info(filename string) (compatible string, version string, er
 	return compatible, version, nil
 }
 
+// Mark keeps a slot bootable (state == “good”), makes it unbootable (state == “bad”)
+// or explicitly activates it for the next boot (state == “active”).
 func (p *Installer) Mark(state string, slotIdentifier string) (slotName string, message string, err error) {
 	err = p.object.Call(p.interfaceForMember("Mark"), 0, state, slotIdentifier).Store(&slotName, &message)
 	if err != nil {
@@ -99,6 +104,7 @@ func (p *Installer) Mark(state string, slotIdentifier string) (slotName string, 
 	return slotName, message, nil
 }
 
+// GetSlotStatus is an access method to get all slots’ status.
 func (p *Installer) GetSlotStatus() (status []SlotStatus, err error) {
 	err = p.object.Call(p.interfaceForMember("GetSlotStatus"), 0).Store(&status)
 	if err != nil {
@@ -110,6 +116,7 @@ func (p *Installer) GetSlotStatus() (status []SlotStatus, err error) {
 
 // Properties
 
+// GetOperation returns the current (global) operation RAUC performs.
 func (p *Installer) GetOperation() (string, error) {
 	v, err := p.object.GetProperty(p.interfaceForMember("Operation"))
 	if err != nil {
@@ -119,6 +126,7 @@ func (p *Installer) GetOperation() (string, error) {
 	return v.String(), nil
 }
 
+// GetLastError returns the last message of the last error that occurred.
 func (p *Installer) GetLastError() (string, error) {
 	v, err := p.object.GetProperty(p.interfaceForMember("LastError"))
 	if err != nil {
@@ -128,6 +136,8 @@ func (p *Installer) GetLastError() (string, error) {
 	return v.String(), nil
 }
 
+// GetProgress returns installation progress information in the form
+// (percentage, message, nesting depth)
 func (p *Installer) GetProgress() (percentage int32, message string, nestingDepth int32, err error) {
 	variant, err := p.object.GetProperty(p.interfaceForMember("Progress"))
 	if err != nil {
@@ -149,6 +159,8 @@ func (p *Installer) GetProgress() (percentage int32, message string, nestingDept
 	return response.percentage, response.message, response.nestingDepth, nil
 }
 
+// GetCompatible returns the system’s compatible string.
+// This can be used to check for usable bundels.
 func (p *Installer) GetCompatible() (string, error) {
 	v, err := p.object.GetProperty(p.interfaceForMember("Compatible"))
 	if err != nil {
@@ -158,6 +170,8 @@ func (p *Installer) GetCompatible() (string, error) {
 	return v.String(), nil
 }
 
+// GetVariant returns the system’s variant.
+// This can be used to select parts of an bundle.
 func (p *Installer) GetVariant() (string, error) {
 	v, err := p.object.GetProperty(p.interfaceForMember("Variant"))
 	if err != nil {
@@ -167,6 +181,7 @@ func (p *Installer) GetVariant() (string, error) {
 	return v.String(), nil
 }
 
+// GetBootSlot returns the currently used boot slot.
 func (p *Installer) GetBootSlot() (string, error) {
 	v, err := p.object.GetProperty(p.interfaceForMember("BootSlot"))
 	if err != nil {
