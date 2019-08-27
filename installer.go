@@ -35,7 +35,9 @@ func InstallerNew() (*Installer, error) {
 	}
 
 	p.object = p.conn.Object(dbusInterface, dbus.ObjectPath("/"))
-	p.object.AddMatchSignal(fmt.Sprintf("%s.%s", dbusInterface, "Installer"), "Completed",
+	p.conn.AddMatchSignal(
+		dbus.WithMatchInterface(fmt.Sprintf("%s.%s", dbusInterface, "Installer")),
+		dbus.WithMatchMember("Completed"),
 		dbus.WithMatchObjectPath(p.object.Path()))
 
 	return p, nil
