@@ -147,18 +147,21 @@ func (p *Installer) GetProgress() (percentage int32, message string, nestingDept
 	}
 
 	type progressResponse struct {
-		percentage   int32
-		message      string
-		nestingDepth int32
+		Percentage   int32
+		Message      string
+		NestingDepth int32
 	}
 
 	src := make([]interface{}, 1)
 	src[0] = variant.Value()
 
 	var response progressResponse
-	dbus.Store(src, &response)
+	err = dbus.Store(src, &response)
+	if err != nil {
+		return -1, "", -1, fmt.Errorf("RAUC: Cannot store result: %v", err)
+	}
 
-	return response.percentage, response.message, response.nestingDepth, nil
+	return response.Percentage, response.Message, response.NestingDepth, nil
 }
 
 // GetCompatible returns the system’s compatible string.
