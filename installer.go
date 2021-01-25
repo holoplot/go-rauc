@@ -47,13 +47,22 @@ func (p *Installer) interfaceForMember(method string) string {
 	return fmt.Sprintf("%s.%s.%s", dbusInterface, "Installer", method)
 }
 
-// Install triggers the installation of a bundle. This method waits for the "Completed"
+// InstallBundleOptions contains options for the InstallBundle method
+type InstallBundleOptions struct {
+	IgnoreIncompatible bool
+}
+
+// InstallBundle triggers the installation of a bundle. This method waits for the "Completed"
 // signal to be sent by the RAUC daemon.
-func (p *Installer) Install(filename string) error {
+func (p *Installer) InstallBundle(filename string, options InstallBundleOptions) error {
 	doneChannel := make(chan *dbus.Signal, 10)
 	p.conn.Signal(doneChannel)
 
-	err := p.object.Call(p.interfaceForMember("Install"), 0, filename).Err
+	args := map[string]interface{}{
+		"ignore-compatible": options.IgnoreIncompatible,
+	}
+
+	err := p.object.Call(p.interfaceForMember("InstallBundle"), 0, filename, args).Err
 	if err != nil {
 		return fmt.Errorf("RAUC: Install(): %v", err)
 	}

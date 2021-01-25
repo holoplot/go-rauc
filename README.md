@@ -84,9 +84,9 @@ func main() {
 	}
 	log.Printf("Info(): compatible=%s, version=%s", compatible, version)
 
-	err = raucInstaller.Install(filename)
+	err = raucInstaller.InstallBundle(filename, rauc.InstallBundleOptions{})
 	if err != nil {
-		log.Fatal("Install() failed: ", err.Error())
+		log.Fatal("InstallBundle() failed: ", err.Error())
 	}
 }
 ```
