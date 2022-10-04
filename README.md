@@ -11,13 +11,13 @@ of the RAUC project.
 Install the package like this:
 
 ```
-go get https://github.com/holoplot/go-rauc
+go get github.com/holoplot/go-rauc/rauc
 ```
 
 And then use it in your source code.
 
 ```
-import "github.com/holoplot/go-rauc"
+import "github.com/holoplot/go-rauc/rauc"
 ```
 
 # Example
@@ -30,7 +30,7 @@ package main
 
 import (
 	"log"
-	"github.com/holoplot/go-rauc"
+	"github.com/holoplot/go-rauc/rauc"
 )
 
 func main() {
