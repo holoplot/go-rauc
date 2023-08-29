@@ -1,6 +1,6 @@
 module github.com/holoplot/go-rauc
 
-go 1.17
+go 1.12
 
 require (
 	github.com/godbus/dbus/v5 v5.1.0
@@ -8,5 +8,3 @@ require (
 	github.com/mattn/go-isatty v0.0.19
 	github.com/rs/zerolog v1.30.0
 )
-
-require golang.org/x/sys v0.6.0 // indirect
