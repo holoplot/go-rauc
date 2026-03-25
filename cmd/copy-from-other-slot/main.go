@@ -7,16 +7,12 @@ package main
 import (
 	"flag"
 	"io"
+	"log/slog"
 	"os"
 	"strings"
 	"syscall"
-	"time"
 
 	"github.com/holoplot/go-rauc/rauc"
-	"github.com/mattn/go-colorable"
-	"github.com/mattn/go-isatty"
-	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
 )
 
 func stripQuotes(s string) string {
@@ -26,16 +22,6 @@ func stripQuotes(s string) string {
 }
 
 func main() {
-	consoleWriter := zerolog.ConsoleWriter{
-		Out: colorable.NewColorableStdout(),
-	}
-
-	if isatty.IsTerminal(os.Stdout.Fd()) {
-		consoleWriter.TimeFormat = time.RFC3339
-	}
-
-	log.Logger = log.Output(consoleWriter)
-
 	toFlag := flag.String("to", "", "Destination file point (in the host's root filesystem")
 	fromFlag := flag.String("from", "", "File to copy from (in the other slot's filesystem)")
 	mountPointFlag := flag.String("mount-point", "/tmp/rauc-other-slot", "Mount point to use temporarily")
@@ -49,16 +35,14 @@ func main() {
 
 	raucInstaller, err := rauc.InstallerNew()
 	if err != nil {
-		log.Fatal().
-			Err(err).
-			Msg("Cannot initialize")
+		slog.Error("Cannot initialize RAUC installer", "error", err)
+		os.Exit(1)
 	}
 
 	statuses, err := raucInstaller.GetSlotStatus()
 	if err != nil {
-		log.Fatal().
-			Err(err).
-			Msg("Cannot get slot statuses")
+		slog.Error("Cannot get slot statuses", "error", err)
+		os.Exit(1)
 	}
 
 	for _, status := range statuses {
@@ -77,39 +61,27 @@ func main() {
 		}
 
 		device := stripQuotes(status.Status["device"].String())
-		log.Info().
-			Str("device", device).
-			Msg("Device path for mount")
+		slog.Info("Device path for mount", "device", device)
 
 		if err := os.MkdirAll(*mountPointFlag, 0755); err != nil && err != os.ErrExist {
-			log.Error().
-				Err(err).
-				Msg("MkdirTemp() failed")
+			slog.Error("MkdirTemp() failed", "error", err)
+
 			return
 		}
 
 		if err = syscall.Mount(device, *mountPointFlag, "squashfs", 0, ""); err != nil {
-			log.Error().
-				Err(err).
-				Str("device", device).
-				Str("mountPoint", *mountPointFlag).
-				Msg("Unable to mount")
+			slog.Error("Unable to mount", "error", err, "device", device, "mountPoint", *mountPointFlag)
+
 			return
 		}
 
-		log.Info().
-			Str("device", device).
-			Str("mountPoint", *mountPointFlag).
-			Msg("Successfully mounted")
+		slog.Info("Successfully mounted", "device", device, "mountPoint", *mountPointFlag)
 
 		defer syscall.Unmount(*mountPointFlag, 0)
 
 		from, err := os.Open(*mountPointFlag + *fromFlag)
 		if err != nil {
-			log.Error().
-				Err(err).
-				Str("from", *fromFlag).
-				Msg("Cannot open")
+			slog.Error("Cannot open file", "error", err, "from", *fromFlag)
 			return
 		}
 
@@ -117,10 +89,7 @@ func main() {
 
 		to, err := os.OpenFile(*toFlag, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0644)
 		if err != nil {
-			log.Error().
-				Err(err).
-				Str("to", *toFlag).
-				Msg("Cannot open")
+			slog.Error("Cannot open file", "error", err, "to", *toFlag)
 			return
 		}
 
@@ -128,18 +97,10 @@ func main() {
 
 		_, err = io.Copy(to, from)
 		if err != nil {
-			log.Error().
-				Str("to", *toFlag).
-				Str("from", *fromFlag).
-				Err(err).
-				Msg("Cannot copy file content")
+			slog.Error("Cannot copy file content", "error", err, "to", *toFlag, "from", *fromFlag)
 			return
 		}
 
-		log.Info().
-			Str("to", *toFlag).
-			Str("from", *fromFlag).
-			Str("class", *classFlag).
-			Msg("Successfully copied")
+		slog.Info("Successfully copied", "to", *toFlag, "from", *fromFlag, "class", *classFlag)
 	}
 }
