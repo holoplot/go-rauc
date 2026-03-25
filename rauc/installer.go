@@ -58,7 +58,7 @@ func (p *Installer) InstallBundle(filename string, options InstallBundleOptions)
 	doneChannel := make(chan *dbus.Signal, 10)
 	p.conn.Signal(doneChannel)
 
-	args := map[string]interface{}{
+	args := map[string]any{
 		"ignore-compatible": options.IgnoreIncompatible,
 	}
 
@@ -161,7 +161,7 @@ func (p *Installer) GetProgress() (percentage int32, message string, nestingDept
 		NestingDepth int32
 	}
 
-	src := make([]interface{}, 1)
+	src := make([]any, 1)
 	src[0] = variant.Value()
 
 	var response progressResponse
