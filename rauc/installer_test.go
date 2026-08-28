@@ -46,28 +46,77 @@ func TestInstallBundleOptionsArgs(t *testing.T) {
 		}
 	})
 
-	t.Run("extra args are passed through", func(t *testing.T) {
-		args := InstallBundleOptions{
-			ExtraArgs: map[string]any{"tls-no-verify": true},
-		}.args()
+	t.Run("unset options are omitted", func(t *testing.T) {
+		args := InstallBundleOptions{}.args()
 
-		if got := args["tls-no-verify"]; got != true {
-			t.Errorf(`args["tls-no-verify"] = %v, want true`, got)
-		}
-		// Modelled options must still be present alongside extras.
-		if _, ok := args["ignore-compatible"]; !ok {
-			t.Error(`args["ignore-compatible"] missing when ExtraArgs is set`)
+		for _, key := range []string{
+			"ignore-version-limit", "transaction-id", "require-manifest-hash",
+			"tls-cert", "tls-key", "tls-ca", "tls-no-verify", "http-headers",
+		} {
+			if _, ok := args[key]; ok {
+				t.Errorf("args[%q] is set but no option asked for it", key)
+			}
 		}
 	})
 
-	t.Run("extra args win over modelled options", func(t *testing.T) {
+	t.Run("all options", func(t *testing.T) {
 		args := InstallBundleOptions{
-			IgnoreIncompatible: false,
-			ExtraArgs:          map[string]any{"ignore-compatible": true},
+			IgnoreIncompatible:  true,
+			IgnoreVersionLimit:  true,
+			TransactionID:       "5f1f5e1a-8f6a-4a1e-9a4e-1b3c5d7e9f01",
+			RequireManifestHash: "cafebabe",
+			BundleAccessOptions: BundleAccessOptions{
+				TLSCert:     "/etc/rauc/client.pem",
+				TLSKey:      "pkcs11:token=rauc;object=client",
+				TLSCA:       "/etc/rauc/ca.pem",
+				TLSNoVerify: true,
+				HTTPHeaders: []string{"Authorization: Bearer token"},
+			},
 		}.args()
 
-		if got := args["ignore-compatible"]; got != true {
-			t.Errorf(`args["ignore-compatible"] = %v, want true (ExtraArgs applied last)`, got)
+		want := map[string]any{
+			"ignore-compatible":     true,
+			"ignore-version-limit":  true,
+			"transaction-id":        "5f1f5e1a-8f6a-4a1e-9a4e-1b3c5d7e9f01",
+			"require-manifest-hash": "cafebabe",
+			"tls-cert":              "/etc/rauc/client.pem",
+			"tls-key":               "pkcs11:token=rauc;object=client",
+			"tls-ca":                "/etc/rauc/ca.pem",
+			"tls-no-verify":         true,
+		}
+		for key, value := range want {
+			if got := args[key]; got != value {
+				t.Errorf("args[%q] = %v, want %v", key, got, value)
+			}
+		}
+
+		headers, ok := args["http-headers"].([]string)
+		if !ok || len(headers) != 1 || headers[0] != "Authorization: Bearer token" {
+			t.Errorf(`args["http-headers"] = %v, want ["Authorization: Bearer token"]`, args["http-headers"])
+		}
+	})
+}
+
+func TestInspectBundleOptionsArgs(t *testing.T) {
+	t.Run("defaults are empty", func(t *testing.T) {
+		if args := (InspectBundleOptions{}).args(); len(args) != 0 {
+			t.Errorf("args = %v, want empty", args)
+		}
+	})
+
+	t.Run("access options are passed through", func(t *testing.T) {
+		args := InspectBundleOptions{
+			BundleAccessOptions: BundleAccessOptions{
+				TLSCA:       "/etc/rauc/ca.pem",
+				TLSNoVerify: true,
+			},
+		}.args()
+
+		if got := args["tls-ca"]; got != "/etc/rauc/ca.pem" {
+			t.Errorf(`args["tls-ca"] = %v, want "/etc/rauc/ca.pem"`, got)
+		}
+		if got := args["tls-no-verify"]; got != true {
+			t.Errorf(`args["tls-no-verify"] = %v, want true`, got)
 		}
 	})
 }

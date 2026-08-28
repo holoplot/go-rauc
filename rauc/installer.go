@@ -109,24 +109,97 @@ func (p *Installer) stringProperty(name string) (string, error) {
 	return s, nil
 }
 
+// BundleAccessOptions describes how to reach a bundle that is served over the
+// network. It is shared by the methods that take a bundle source. All fields
+// are optional; unset ones are not sent to the daemon, which then applies its
+// own defaults.
+type BundleAccessOptions struct {
+	// TLSCert is the file path or PKCS#11 URL of the client certificate to
+	// authenticate with against the server.
+	TLSCert string
+
+	// TLSKey is the file path or PKCS#11 URL of the private key belonging to
+	// TLSCert.
+	TLSKey string
+
+	// TLSCA is the file path of the CA certificate used to authenticate the
+	// server, in place of the system's trust store.
+	TLSCA string
+
+	// TLSNoVerify disables verification of the server certificate.
+	TLSNoVerify bool
+
+	// HTTPHeaders are additional HTTP headers to send with every request, each
+	// in "Name: value" form, e.g. to pass a bearer token.
+	HTTPHeaders []string
+}
+
+func (o BundleAccessOptions) apply(args map[string]any) {
+	if o.TLSCert != "" {
+		args["tls-cert"] = o.TLSCert
+	}
+	if o.TLSKey != "" {
+		args["tls-key"] = o.TLSKey
+	}
+	if o.TLSCA != "" {
+		args["tls-ca"] = o.TLSCA
+	}
+	if o.TLSNoVerify {
+		args["tls-no-verify"] = true
+	}
+	if len(o.HTTPHeaders) > 0 {
+		args["http-headers"] = o.HTTPHeaders
+	}
+}
+
 // InstallBundleOptions contains options for the InstallBundle method
 type InstallBundleOptions struct {
+	// IgnoreIncompatible installs a bundle whose compatible string does not
+	// match the one of the running system.
 	IgnoreIncompatible bool
 
-	// ExtraArgs are passed through to RAUC's InstallBundle argument dictionary
-	// unmodified, and are applied after the options above. This allows use of
-	// arguments the daemon supports but this package does not model yet, such
-	// as TLS material or HTTP headers for bundles served over the network.
-	ExtraArgs map[string]any
+	// IgnoreVersionLimit disables the minimum bundle version check configured
+	// in system.conf.
+	IgnoreVersionLimit bool
+
+	// TransactionID is a caller-chosen UUID identifying this installation. If
+	// empty, the daemon generates one.
+	TransactionID string
+
+	// RequireManifestHash aborts the installation unless the bundle's manifest
+	// hash matches this value.
+	RequireManifestHash string
+
+	BundleAccessOptions
 }
 
 func (o InstallBundleOptions) args() map[string]any {
 	args := map[string]any{
 		"ignore-compatible": o.IgnoreIncompatible,
 	}
-	for k, v := range o.ExtraArgs {
-		args[k] = v
+	if o.IgnoreVersionLimit {
+		args["ignore-version-limit"] = true
 	}
+	if o.TransactionID != "" {
+		args["transaction-id"] = o.TransactionID
+	}
+	if o.RequireManifestHash != "" {
+		args["require-manifest-hash"] = o.RequireManifestHash
+	}
+	o.BundleAccessOptions.apply(args)
+
+	return args
+}
+
+// InspectBundleOptions contains options for the InspectBundle method
+type InspectBundleOptions struct {
+	BundleAccessOptions
+}
+
+func (o InspectBundleOptions) args() map[string]any {
+	args := map[string]any{}
+	o.BundleAccessOptions.apply(args)
+
 	return args
 }
 
@@ -198,21 +271,10 @@ func (p *Installer) Info(filename string) (compatible string, version string, er
 
 // InspectBundle returns the manifest and metadata of a bundle without
 // installing it. It accepts the same source forms as InstallBundle, including
-// network locations.
-//
-// args is passed to the daemon unmodified and may be nil.
-func (p *Installer) InspectBundle(filename string, args map[string]any) (map[string]dbus.Variant, error) {
-	return p.InspectBundleContext(context.Background(), filename, args)
-}
-
-// InspectBundleContext behaves like InspectBundle but is cancellable.
-func (p *Installer) InspectBundleContext(ctx context.Context, filename string, args map[string]any) (map[string]dbus.Variant, error) {
-	if args == nil {
-		args = map[string]any{}
-	}
-
+// network locations, and abandons the call when ctx is done.
+func (p *Installer) InspectBundle(ctx context.Context, filename string, options InspectBundleOptions) (map[string]dbus.Variant, error) {
 	var info map[string]dbus.Variant
-	err := p.object.CallWithContext(ctx, p.interfaceForMember("InspectBundle"), 0, filename, args).Store(&info)
+	err := p.object.CallWithContext(ctx, p.interfaceForMember("InspectBundle"), 0, filename, options.args()).Store(&info)
 	if err != nil {
 		return nil, fmt.Errorf("RAUC: InspectBundle(): %v", err)
 	}
@@ -314,9 +376,11 @@ func (p *Installer) WatchProgress(ctx context.Context) (<-chan Progress, error) 
 	updates := make(chan Progress, 16)
 
 	go func() {
-		defer close(updates)
-		defer p.conn.RemoveSignal(signals)
-		defer func() { _ = p.conn.RemoveMatchSignal(matchOptions...) }()
+		defer func() {
+			_ = p.conn.RemoveMatchSignal(matchOptions...)
+			p.conn.RemoveSignal(signals)
+			close(updates)
+		}()
 
 		for {
 			select {
